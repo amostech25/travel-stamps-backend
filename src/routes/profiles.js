@@ -4,6 +4,7 @@ const prisma = require("../lib/prisma");
 const { requireAuth } = require("../middleware/auth");
 const { writeLimiter } = require("../middleware/rateLimit");
 const { upload, processAndSaveImage } = require("../middleware/upload");
+const asyncHandler = require("../lib/asyncHandler");
 
 const router = express.Router();
 
@@ -74,14 +75,14 @@ const fullInclude = {
 
 // Public — anyone can view any profile. This is the "public-facing page"
 // requirement: no auth required to read, only to write.
-router.get("/:handle", async (req, res) => {
+router.get("/:handle", asyncHandler(async (req, res) => {
   const user = await prisma.user.findUnique({
     where: { handle: req.params.handle.toLowerCase() },
     include: fullInclude,
   });
   if (!user) return res.status(404).json({ error: "No traveller with that handle." });
   res.json(shapeProfile(user, req.userId || null));
-});
+}));
 
 const bioSchema = z.object({
   summary: z.string().trim().min(1).max(500),
@@ -97,7 +98,7 @@ const bioSchema = z.object({
 // Auth required — and note there's no ":handle" param here at all. You can
 // only ever edit YOUR OWN bio (req.userId from the verified session), never
 // someone else's by guessing their handle.
-router.patch("/me/bio", requireAuth, writeLimiter, async (req, res) => {
+router.patch("/me/bio", requireAuth, writeLimiter, asyncHandler(async (req, res) => {
   const parsed = bioSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "Invalid input.", details: parsed.error.flatten() });
@@ -119,7 +120,7 @@ router.patch("/me/bio", requireAuth, writeLimiter, async (req, res) => {
   ]);
 
   res.status(204).end();
-});
+}));
 
 router.post("/me/photo", requireAuth, writeLimiter, upload.single("photo"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No image uploaded." });

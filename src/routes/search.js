@@ -1,5 +1,6 @@
 const express = require("express");
 const prisma = require("../lib/prisma");
+const asyncHandler = require("../lib/asyncHandler");
 
 const router = express.Router();
 
@@ -22,7 +23,7 @@ function shapeResult(user) {
 }
 
 // GET /api/search?q=...   (empty q = directory listing, most recent first)
-router.get("/", async (req, res) => {
+router.get("/", asyncHandler(async (req, res) => {
   const q = (req.query.q || "").trim();
   const excludeHandle = req.userHandle;
 
@@ -41,10 +42,10 @@ router.get("/", async (req, res) => {
   });
 
   res.json(users.map(shapeResult));
-});
+}));
 
 // GET /api/search/tags/:tag
-router.get("/tags/:tag", async (req, res) => {
+router.get("/tags/:tag", asyncHandler(async (req, res) => {
   const users = await prisma.user.findMany({
     where: { bio: { types: { some: { label: req.params.tag } } } },
     include: { bio: { include: { types: true } }, _count: { select: { countries: true } } },
@@ -52,6 +53,6 @@ router.get("/tags/:tag", async (req, res) => {
     take: 40,
   });
   res.json(users.map(shapeResult));
-});
+}));
 
 module.exports = router;

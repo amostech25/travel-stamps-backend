@@ -3,6 +3,7 @@ const { z } = require("zod");
 const prisma = require("../lib/prisma");
 const { requireAuth } = require("../middleware/auth");
 const { writeLimiter, likeLimiter } = require("../middleware/rateLimit");
+const asyncHandler = require("../lib/asyncHandler");
 
 const router = express.Router();
 
@@ -21,7 +22,7 @@ const spotSchema = z.object({
 
 // Auth required. Always writes under req.userId — there is no way to pass
 // "whose map" in the body, so you can only ever add spots to your own map.
-router.post("/", requireAuth, writeLimiter, async (req, res) => {
+router.post("/", requireAuth, writeLimiter, asyncHandler(async (req, res) => {
   const parsed = spotSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "Invalid input.", details: parsed.error.flatten() });
@@ -50,7 +51,7 @@ router.post("/", requireAuth, writeLimiter, async (req, res) => {
   });
 
   res.status(201).json({ id: spot.id, country, city });
-});
+}));
 
 const refSchema = z.object({
   url: z.string().url(),
@@ -80,7 +81,7 @@ async function assertOwnsSpot(spotId, userId) {
   return { ok: true, spot };
 }
 
-router.post("/:id/references", requireAuth, writeLimiter, async (req, res) => {
+router.post("/:id/references", requireAuth, writeLimiter, asyncHandler(async (req, res) => {
   const parsed = refSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Paste a valid link." });
 
@@ -94,12 +95,12 @@ router.post("/:id/references", requireAuth, writeLimiter, async (req, res) => {
     data: { spotId: req.params.id, type, url, label },
   });
   res.status(201).json(ref);
-});
+}));
 
 // Toggle like — the (spotId, userId) unique constraint on Like means this is
 // safe even under rapid double-clicks or concurrent requests: the second
 // attempt to create will fail on the constraint rather than double-counting.
-router.post("/:id/like", requireAuth, likeLimiter, async (req, res) => {
+router.post("/:id/like", requireAuth, likeLimiter, asyncHandler(async (req, res) => {
   const spot = await prisma.spot.findUnique({ where: { id: req.params.id } });
   if (!spot) return res.status(404).json({ error: "Spot not found." });
 
@@ -115,6 +116,6 @@ router.post("/:id/like", requireAuth, likeLimiter, async (req, res) => {
 
   const count = await prisma.like.count({ where: { spotId: req.params.id } });
   res.json({ liked: !existing, likeCount: count });
-});
+}));
 
 module.exports = router;

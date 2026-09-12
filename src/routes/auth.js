@@ -4,6 +4,7 @@ const { z } = require("zod");
 const prisma = require("../lib/prisma");
 const { setSessionCookie, clearSessionCookie, requireAuth } = require("../middleware/auth");
 const { authLimiter } = require("../middleware/rateLimit");
+const asyncHandler = require("../lib/asyncHandler");
 
 const router = express.Router();
 
@@ -30,7 +31,7 @@ const signupSchema = z.object({
   }),
 });
 
-router.post("/signup", authLimiter, async (req, res) => {
+router.post("/signup", authLimiter, asyncHandler(async (req, res) => {
   const parsed = signupSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "Invalid input.", details: parsed.error.flatten() });
@@ -62,14 +63,14 @@ router.post("/signup", authLimiter, async (req, res) => {
 
   setSessionCookie(res, user);
   res.status(201).json({ id: user.id, handle: user.handle, displayName: user.displayName });
-});
+}));
 
 const loginSchema = z.object({
   handle: z.string().trim().min(1),
   password: z.string().min(1),
 });
 
-router.post("/login", authLimiter, async (req, res) => {
+router.post("/login", authLimiter, asyncHandler(async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Enter your handle and password." });
 
@@ -86,20 +87,20 @@ router.post("/login", authLimiter, async (req, res) => {
 
   setSessionCookie(res, user);
   res.json({ id: user.id, handle: user.handle, displayName: user.displayName });
-});
+}));
 
 router.post("/logout", (req, res) => {
   clearSessionCookie(res);
   res.status(204).end();
 });
 
-router.get("/me", requireAuth, async (req, res) => {
+router.get("/me", requireAuth, asyncHandler(async (req, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.userId },
     select: { id: true, handle: true, displayName: true },
   });
   if (!user) return res.status(404).json({ error: "Not found." });
   res.json(user);
-});
+}));
 
 module.exports = router;
