@@ -1,15 +1,17 @@
 // Travel Stamps — data model
 //
-// Dev default is SQLite (zero setup). For production, point DATABASE_URL at
-// Postgres and change the provider below to "postgresql" — the schema itself
-// needs no other changes to run on Postgres.
+// Configured for Postgres, since that's what hosting platforms like Render
+// provide as a free managed database with persistent storage (SQLite's
+// single-file approach doesn't survive most hosting platforms' ephemeral
+// disks). DATABASE_URL is supplied by the platform as an environment
+// variable — you won't need to type a connection string by hand.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
