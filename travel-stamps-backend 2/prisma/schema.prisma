@@ -1,0 +1,132 @@
+// Travel Stamps — data model
+//
+// Configured for Postgres, since that's what hosting platforms like Render
+// provide as a free managed database with persistent storage (SQLite's
+// single-file approach doesn't survive most hosting platforms' ephemeral
+// disks). DATABASE_URL is supplied by the platform as an environment
+// variable — you won't need to type a connection string by hand.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  handle       String   @unique
+  displayName  String
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  bio       Bio?
+  countries Country[]
+  likes     Like[]
+
+  following Follow[] @relation("Following")
+  followers Follow[] @relation("Followers")
+}
+
+model Bio {
+  id       String @id @default(cuid())
+  userId   String @unique
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  summary  String @default("")
+  insight  String @default("")
+  photoUrl String?
+
+  types BioType[]
+  links SocialLink[]
+}
+
+model BioType {
+  id    String @id @default(cuid())
+  bioId String
+  bio   Bio    @relation(fields: [bioId], references: [id], onDelete: Cascade)
+  label String
+
+  @@unique([bioId, label])
+}
+
+model SocialLink {
+  id    String @id @default(cuid())
+  bioId String
+  bio   Bio    @relation(fields: [bioId], references: [id], onDelete: Cascade)
+  type  String // youtube | tiktok | instagram | twitter | website
+  url   String
+}
+
+model Country {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name   String
+  cities City[]
+
+  @@unique([userId, name])
+}
+
+model City {
+  id        String  @id @default(cuid())
+  countryId String
+  country   Country @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  name      String
+  spots     Spot[]
+
+  @@unique([countryId, name])
+}
+
+model Spot {
+  id        String   @id @default(cuid())
+  cityId    String
+  city      City     @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  name      String
+  tag       String   // food | sight | hike | other
+  verdict   String   // must-see | good | skip
+  note      String   @default("")
+  mapsUrl   String?
+  createdAt DateTime @default(now())
+
+  references SpotReference[]
+  likes      Like[]
+}
+
+model SpotReference {
+  id     String @id @default(cuid())
+  spotId String
+  spot   Spot   @relation(fields: [spotId], references: [id], onDelete: Cascade)
+  type   String // youtube | tiktok | instagram | image
+  url    String
+  label  String
+}
+
+// One row per (spot, user) — the unique constraint is what makes a like
+// genuinely one-per-user, enforced by the database rather than trusted
+// client-side bookkeeping.
+model Like {
+  id        String   @id @default(cuid())
+  spotId    String
+  spot      Spot     @relation(fields: [spotId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([spotId, userId])
+}
+
+// One row per (follower, following) pair — same pattern as Like: the unique
+// constraint is what makes following someone twice a no-op rather than a
+// duplicate, and unfollowing is just deleting the row.
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  follower    User     @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
+  followingId String
+  following   User     @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+}
