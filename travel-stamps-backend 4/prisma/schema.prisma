@@ -1,0 +1,104 @@
+// Travel Stamps — data model
+//
+// This is now a single-owner personal guide, not a multi-user platform:
+// exactly one User row is ever allowed to exist (enforced in the signup
+// route, not here — Prisma has no "max one row" constraint). Everything
+// else hangs off that one owner's countries/cities/spots.
+//
+// Configured for Postgres, since that's what hosting platforms like Render
+// provide as a free managed database with persistent storage. DATABASE_URL
+// is supplied by the platform as an environment variable.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  handle       String   @unique
+  displayName  String
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  bio       Bio?
+  countries Country[]
+}
+
+model Bio {
+  id       String @id @default(cuid())
+  userId   String @unique
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  summary  String @default("")
+  insight  String @default("")
+  photoUrl String?
+
+  types BioType[]
+  links SocialLink[]
+}
+
+model BioType {
+  id    String @id @default(cuid())
+  bioId String
+  bio   Bio    @relation(fields: [bioId], references: [id], onDelete: Cascade)
+  label String
+
+  @@unique([bioId, label])
+}
+
+model SocialLink {
+  id    String @id @default(cuid())
+  bioId String
+  bio   Bio    @relation(fields: [bioId], references: [id], onDelete: Cascade)
+  type  String // youtube | tiktok | instagram | twitter | website
+  url   String
+}
+
+model Country {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name   String
+  cities City[]
+
+  @@unique([userId, name])
+}
+
+model City {
+  id        String  @id @default(cuid())
+  countryId String
+  country   Country @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  name      String
+  spots     Spot[]
+
+  @@unique([countryId, name])
+}
+
+model Spot {
+  id         String   @id @default(cuid())
+  cityId     String
+  city       City     @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  name       String
+  tag        String   // food | sight | hike | other
+  verdict    String   // must-see | good | skip
+  note       String   @default("")
+  mapsUrl    String?
+  blackOwned Boolean  @default(false)
+  status     String   @default("approved") // pending | approved | rejected
+  createdAt  DateTime @default(now())
+
+  references SpotReference[]
+}
+
+model SpotReference {
+  id     String @id @default(cuid())
+  spotId String
+  spot   Spot   @relation(fields: [spotId], references: [id], onDelete: Cascade)
+  type   String // youtube | tiktok | instagram | image
+  url    String
+  label  String
+}
